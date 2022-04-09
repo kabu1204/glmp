@@ -3,10 +3,10 @@ project(glmp)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_library(glmp glmp/library.cc)
+add_library(glmp glmp/src/library.cc glmp/include/threadpool.hpp glmp/src/pipeline.cc glmp/include/pipeline.h glmp/include/concurrentqueue.hpp)
 
 add_executable(test test/test.cc)
 
-include_directories(/usr/local/include thirdparty/GLFW/include glmp)
+include_directories(/usr/local/include thirdparty/GLFW/include thirdparty/FFMPEG/include glmp)
 
-link_directories(thirdparty/GLFW/lib)
+link_directories(thirdparty/GLFW/lib thirdparty/FFMPEG/lib)
