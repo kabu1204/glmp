@@ -3,7 +3,7 @@ project(glmp)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_library(glmp glmp/src/library.cc glmp/include/threadpool.hpp glmp/src/pipeline.cc glmp/include/pipeline.h glmp/include/concurrentqueue.hpp)
+add_library(glmp glmp/src/library.cc glmp/include/threadpool.hpp glmp/src/pipeline.cc glmp/include/pipeline.h glmp/include/concurrentqueue.hpp glmp/include/ringqueue.hpp)
 
 add_executable(test test/test.cc)
 

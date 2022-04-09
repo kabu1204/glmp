@@ -16,7 +16,9 @@
 #include "functional"
 #include "condition_variable"
 #include "concurrentqueue.hpp"
+#include "ringqueue.hpp"
 #define THREADPOOL_MAX_TASKS_SIZE ~(1<<31)-1
+#define LFRINGQUEUE_UI_COUNT 1000
 
 /**
  * std::thread && 无锁队列实现的线程池
@@ -33,14 +35,15 @@ public:
     {
         for(int i=0;i<n_threads;++i){
             workers.emplace_back([this]{
+                std::function<void()> *task{nullptr};
                 while(status>0){
-                    if(tasks.empty()){
+                    tasks.dequeue(&task);
+                    if(!task){
+                        // TODO
                         std::this_thread::sleep_for(std::chrono::milliseconds(_sleep_interval));
                         continue;
                     }
-                    std::function<void()> task = tasks.front();
-                    tasks.pop();
-                    task();
+                    (*task)();
                 }
             });
         }
@@ -55,11 +58,12 @@ public:
      */
     template<typename F, typename... Args>
     auto submit(F&& function, Args&&...args){
+        if(status<0) throw std::runtime_error("threadpool stopped");
         using return_type = typename std::result_of<F(Args...)>::type;
         auto task = std::make_shared<std::packaged_task<return_type()>>(std::bind(std::forward<F>(function), std::forward<Args>(args)...));
         std::future<return_type> res = task->get_future();
-        if(status<0) throw std::runtime_error("threadpool stopped");
-        tasks.emplace([task](){ (*task)(); });
+        static auto* wrapped = new std::function<void()>([task](){(*task)();});
+        tasks.enqueue(wrapped);
         return res;
     }
     /**
@@ -74,6 +78,6 @@ private:
     uint32_t _sleep_interval;
     std::atomic<uint8_t> status;
     std::vector<std::thread> workers;
-    LinkedConcurrentQueue<std::function<void()>> tasks;
+    lfringqueue<std::function<void()>, LFRINGQUEUE_UI_COUNT> tasks;
 };
 #endif //GLMP_THREADPOOL_HPP

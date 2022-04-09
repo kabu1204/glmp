@@ -30,11 +30,12 @@ public:
     void emplace(Args&& ...args){
         Node* new_node{new Node(std::forward<Args>(args)...)};
         Node* old_back{nullptr};
+        Node* null_node{nullptr};
         do{
             old_back = _back.load();
-        } while(old_back->next.compare_exchange_weak(nullptr, new_node) != true);
+        } while(_size>0 && old_back->next.compare_exchange_weak(null_node, new_node) != true);
         _back.compare_exchange_weak(old_back, new_node);
-        if(++_size==1) _front.compare_exchange_weak(nullptr, new_node);
+        if(++_size==1) _front.compare_exchange_weak(null_node, new_node);
         ++_capacity;
     }
     /**
@@ -44,11 +45,12 @@ public:
     void push(const T& elem){
         Node* new_node{new Node(elem)};
         Node* old_back{nullptr};
+        Node* null_node{nullptr};
         do{
             old_back = _back.load();
-        } while(old_back->next.compare_exchange_weak(nullptr, new_node) != true);
+        } while(_size>0 && old_back->next.compare_exchange_weak(null_node, new_node) != true);
         _back.compare_exchange_weak(old_back, new_node);
-        if(++_size==1) _front.compare_exchange_weak(nullptr, new_node);
+        if(++_size==1) _front.compare_exchange_weak(null_node, new_node);
         ++_capacity;
     }
     /**
@@ -71,10 +73,12 @@ public:
      * 队首元素出队并返回其引用
      * @return 队首元素的引用
      */
-    T& deque(){
+    T deque(){
         if(_size==0) throw std::runtime_error("Queue is empty");
-        Node* old_front{_front.load()};
-        while(_front.compare_exchange_weak(old_front, old_front->next) != true);
+        Node* old_front{nullptr};
+        do{
+            old_front = _front.load();
+        } while(old_front && _front.compare_exchange_weak(old_front, old_front->next) != true);
         --_size;
         return old_front->val;
     }
