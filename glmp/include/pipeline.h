@@ -20,16 +20,16 @@
  * @tparam OUT_T 该节管道处理结果的类型
  * @tparam IN_T 该节管道输入数据的类型
  */
-template<typename OUT_T, typename... IN_T>
+template<typename OUT_T, typename IN_T>
 class Pipe{
 public:
     /**
      * @brief 创建一节对数据进行处理的管道
      * @details
      */
-    explicit Pipe(std::function<OUT_T(IN_T...)>&& f):func(f){};
-    void process(IN_T... args){
-        result = func(std::forward<IN_T...>(args...));
+    explicit Pipe(std::function<OUT_T(IN_T)>&& f):func(f){};
+    void process(IN_T arg){
+        result = func(std::forward<IN_T>(arg));
     }
     /**
      * [语法糖]重载管道运算符
@@ -42,13 +42,13 @@ public:
         p.process(result);
         return p;
     }
-    OUT_T operator()(IN_T... args){
-        process(std::forward<IN_T...>(args...));
+    OUT_T operator()(IN_T arg){
+        process(std::forward<IN_T>(arg));
         return result;
     }
 
 private:
-    std::function<OUT_T(IN_T...)> func;
+    std::function<OUT_T(IN_T)> func;
     OUT_T result;
 };
 
@@ -81,9 +81,9 @@ auto operator|(T&& data, F&& f){
 }
 
 
-template<typename OUT_T, typename... IN_T>
-auto make_pipe(std::function<OUT_T(IN_T...)>&& f){
-    return Pipe<OUT_T, IN_T...>(f);
+template<typename OUT_T, typename IN_T>
+auto make_pipe(std::function<OUT_T(IN_T)>&& f){
+    return Pipe<OUT_T, IN_T>(f);
 }
 
 #endif //GLMP_PIPELINE_H

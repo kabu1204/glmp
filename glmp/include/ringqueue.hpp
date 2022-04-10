@@ -5,7 +5,6 @@
 #ifndef GLMP_RINGQUEUE_HPP
 #define GLMP_RINGQUEUE_HPP
 #define _ENABLE_ATOMIC_ALIGNMENT_FIX
-#define ATOMIC_FLAG_INIT 0
 #pragma once
 
 #include <vector>
