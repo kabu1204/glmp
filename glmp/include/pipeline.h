@@ -61,6 +61,24 @@ private:
     OUT_T result;
 };
 
+/**
+ * [语法糖]重载管道运算符
+ * @tparam T 待处理的数据类型
+ * @tparam F 函数类型
+ * @param data 待处理数据
+ * @param f 普通函数、lambda函数、std::function等
+ * @return 处理结果
+ */
+template<typename T, typename F>
+auto operator|(T &&data, F &&f) {
+    return std::forward<F>(f)(std::forward<T>(data));
+}
+
+template<typename OUT_T, typename IN_T>
+auto make_pipe(std::function<OUT_T(IN_T)> &&f) {
+    return Pipe<OUT_T, IN_T>(f);
+}
+
 template<typename IN, typename OUT>
 constexpr std::function<OUT(IN)> default_func() {
     auto f = [](IN &&elem) -> OUT {
@@ -71,12 +89,17 @@ constexpr std::function<OUT(IN)> default_func() {
     return std::function<OUT(IN)>(f);
 }
 
+template<typename...> class Pipeline;
+
 template<typename... STAGES_T>
 class QueuePipeline {
 public:
     using QUEUE_T = typename std::tuple<lfringqueue<STAGES_T, MAX_RING_BUFFER_SIZE>...>;
     using PROC_T = typename zip<STAGES_T...>::tuple_functions::type;
+    using IN_T = typename select_type<0, STAGES_T...>::type;
+    using OUT_T = typename select_last<STAGES_T...>::type;
 
+    friend class Pipeline<STAGES_T...>;
     /**
      * @brief 创建一条管线（流水线），由多个Queue和Func组成
      * @details 每个Pipeline对象仅仅是一条管线，内部的并行是指对数据进行并行处理，而不是多条管线并行。
@@ -112,6 +135,8 @@ public:
     void DebugInfo() {
         PRINT_TYPE(QUEUE_T);
         PRINT_TYPE(PROC_T);
+        PRINT_TYPE(IN_T);
+        PRINT_TYPE(OUT_T);
     }
 
 private:
@@ -120,23 +145,86 @@ private:
     PROC_T _funcs;
 };
 
-/**
- * [语法糖]重载管道运算符
- * @tparam T 待处理的数据类型
- * @tparam F 函数类型
- * @param data 待处理数据
- * @param f 普通函数、lambda函数、std::function等
- * @return 处理结果
- */
-template<typename T, typename F>
-auto operator|(T &&data, F &&f) {
-    return std::forward<F>(f)(std::forward<T>(data));
-}
+template<typename... STAGES_T>
+class Pipeline{
+    using SELF_T = Pipeline<STAGES_T...>;
+    using QP_T = QueuePipeline<STAGES_T...>;
+    using IN_T = typename QP_T::IN_T;
+    using OUT_T = typename QP_T::OUT_T;
+public:
+    Pipeline() = default;
+    /**
+     * 原地构造对象并提交；或在提交右值时被调用
+     * @tparam Args
+     * @param args
+     */
+    template<typename... Args>
+    void Emplace(Args&&... args){
+        IN_T *p {new IN_T(args...)};
+    }
+    /**
+     * 复制构造对象并提交
+     * @param elem 左值对象
+     */
+    void Submit(const IN_T& elem){
+        IN_T *p {new IN_T(elem)};
+    }
+    /**
+     * 移动右值后复制构造，并提交
+     * @param elem 右值对象
+     */
+    void Submit(IN_T&& elem){
+        Emplace(std::move(elem));
+    }
+    /**
+     * 直接提交对象指针
+     * @param elem_ptr 对象指针
+     */
+    void Submit(IN_T* elem_ptr){
+    }
+    void Get(OUT_T* ret){}
+    void AsyncSubmit(IN_T&& elem){
+        AsyncEmplace(std::move(elem));
+        std::cout<<"IN_T&&: "<<elem<<std::endl;
+    }
+    void AsyncSubmit(const IN_T& elem){
+        IN_T *p {new IN_T(elem)};
+        std::cout<<"const IN_T&: "<<elem<<std::endl;
+    }
+    void AsyncSubmit(IN_T* elem){
+        IN_T *p = elem;
+        pp = p;
+        std::cout<<"IN_T*: "<<(*elem)<<std::endl;
+    }
+    template<typename... Args>
+    void AsyncEmplace(Args&&... args){
+        IN_T *p {new IN_T(args...)};
+        std::cout<<"Emplace: "<<(*p)<<std::endl;
+    }
 
+    SELF_T& operator<<(const IN_T& elem){
+        AsyncSubmit(elem);
+        return *this;
+    }
 
-template<typename OUT_T, typename IN_T>
-auto make_pipe(std::function<OUT_T(IN_T)> &&f) {
-    return Pipe<OUT_T, IN_T>(f);
-}
+    SELF_T& operator<<(IN_T&& elem){
+        AsyncSubmit(std::forward<decltype(elem)>(elem));
+        return *this;
+    }
+    SELF_T& operator<<(IN_T* elem_ptr){
+        AsyncSubmit(elem_ptr);
+        return *this;
+    }
+    void t(){
+        std::cout<<"test:"<<(*pp)<<std::endl;
+    }
+
+    SELF_T& operator=(const SELF_T& rhs) = delete;  // 禁用赋值
+    Pipeline(const SELF_T& x) = delete; // 禁用拷贝构造
+    Pipeline(SELF_T&& x) = delete; // 禁用移动构造
+private:
+    QP_T Qp;
+    IN_T* pp;
+};
 
 #endif //GLMP_PIPELINE_H

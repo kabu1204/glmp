@@ -45,6 +45,10 @@ template< class A, class... Args> struct select_last<A, Args...>{
 };
 #endif
 
+template<std::size_t I, class... Args> struct select_type{
+    using type = typename std::tuple_element<I, std::tuple<Args...>>::type;
+};
+
 template <typename T, typename S>
 struct pop_back;
 
