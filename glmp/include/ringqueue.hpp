@@ -21,6 +21,7 @@ template < typename TyData, long _uiCount = 100000 >
 class lfringqueue
 {
 public:
+    using value_type = TyData;
     explicit lfringqueue( long uiCount = _uiCount ) : m_lTailIterator(0), m_lHeadIterator(0), m_uiCount( uiCount )
     {
         m_queue = new TyData*[m_uiCount]{nullptr};

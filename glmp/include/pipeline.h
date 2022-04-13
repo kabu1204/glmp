@@ -4,7 +4,10 @@
 
 #ifndef GLMP_PIPELINE_H
 #define GLMP_PIPELINE_H
+
 #include "threadpool.hpp"
+#include "ringqueue.hpp"
+#include "iostream"
 #include "vector"
 #include "atomic"
 #include "future"
@@ -14,58 +17,108 @@
 #include "queue"
 #include "type_traits"
 #include "cstdio"
+#include "platform.hpp"
+
+#define MAX_RING_BUFFER_SIZE 128
 
 /**
  * 管道类，每个管道和一个处理函数绑定
- * @tparam OUT_T 该节管道处理结果的类型
- * @tparam IN_T 该节管道输入数据的类型
+ * @tparam IN_T 该节管道处理结果的类型
+ * @tparam OUT_T 该节管道输入数据的类型
  */
-template<typename OUT_T, typename IN_T>
-class Pipe{
+template<typename IN_T, typename OUT_T, typename NEXT_OUT_T=void *>
+class Pipe {
 public:
     /**
      * @brief 创建一节对数据进行处理的管道
      * @details
      */
-    explicit Pipe(std::function<OUT_T(IN_T)>&& f):func(f){};
-    void process(IN_T arg){
+    explicit Pipe(std::function<OUT_T(IN_T)> &&f) : func(f) {};
+
+    void process(IN_T arg) {
         result = func(std::forward<IN_T>(arg));
     }
+
     /**
      * [语法糖]重载管道运算符
      * @tparam NEXT_OUT_T 下一节管道的输出类型
      * @param p 下一节管道
      * @return 参数p的引用
      */
-    template<class NEXT_OUT_T>
-    Pipe<NEXT_OUT_T, OUT_T>& operator|(Pipe<NEXT_OUT_T, OUT_T>&& p){
-        p.process(result);
-        return p;
+    Pipe<NEXT_OUT_T, OUT_T> &&operator|(Pipe<NEXT_OUT_T, OUT_T> &&p) {
+        p_next = &p;
+        return std::forward<decltype(p)>(p);
     }
-    OUT_T operator()(IN_T arg){
+
+    OUT_T operator()(IN_T arg) {
         process(std::forward<IN_T>(arg));
         return result;
     }
 
 private:
     std::function<OUT_T(IN_T)> func;
+    Pipe<OUT_T, NEXT_OUT_T> *p_next{nullptr};
     OUT_T result;
 };
 
-class Pipeline{
-    /**
-     * @brief 创建一条管线（流水线），由一节或多节管道组成
-     * @details 每个Pipeline对象仅仅是一条管线，内部的并行是指对数据进行并行处理，而不是多条管线并行。
-     * 需要多条管线并行，你需要使用更高的封装：
-     */
-    Pipeline();
-};
+template<typename IN, typename OUT>
+constexpr std::function<OUT(IN)> default_func() {
+    auto f = [](IN &&elem) -> OUT {
+        std::cout << "default proc function: cast " << type_name<IN>() << " to " << type_name<OUT>() << std::endl;
+        // if compile error here, it means you have to define the proc function yourself
+        return static_cast<OUT>(elem);
+    };
+    return std::function<OUT(IN)>(f);
+}
 
-//template<typename IN_T, typename OUT_T>
-//auto operator|(IN_T&& data, Pipe<OUT_T, IN_T>&& p){
-//    p.process(std::forward<IN_T>(data));
-//    return std::forward<decltype(p)>(p);
-//}
+template<typename... STAGES_T>
+class QueuePipeline {
+public:
+    using QUEUE_T = typename std::tuple<lfringqueue<STAGES_T, MAX_RING_BUFFER_SIZE>...>;
+    using PROC_T = typename zip<STAGES_T...>::tuple_functions::type;
+
+    /**
+     * @brief 创建一条管线（流水线），由多个Queue和Func组成
+     * @details 每个Pipeline对象仅仅是一条管线，内部的并行是指对数据进行并行处理，而不是多条管线并行。
+     * 需要多条管线并行，你需要使用更高的封装：TODO
+     */
+    QueuePipeline() {
+        Init(std::make_integer_sequence<int, sizeof...(STAGES_T) - 1>{});
+    };
+
+    /**
+     * 初始化_funcs, 设置默认处理函数
+     * @tparam N number of stages
+     * @return
+     */
+    template<int...N>
+    constexpr void Init(std::integer_sequence<int, N...> const &) {
+        using _unused = int[];
+        (void) _unused{0, (SetFunction<N>(default_func<typename std::tuple_element<N, QUEUE_T>::type::value_type,
+                typename std::tuple_element<N + 1, QUEUE_T>::type::value_type>()), 0)...};
+        (void) _unused{0, (std::get<N>(_funcs)(0), 0)...};
+    };
+
+    /**
+     * 为_funcs<Stage>设置处理函数
+     * @tparam Stage 某一stage
+     * @param function std::function
+     */
+    template<std::size_t Stage>
+    void SetFunction(typename std::tuple_element<Stage, PROC_T>::type &&function) {
+        std::get<Stage>(_funcs) = function;
+    }
+
+    void DebugInfo() {
+        PRINT_TYPE(QUEUE_T);
+        PRINT_TYPE(PROC_T);
+    }
+
+private:
+    std::size_t n_stages{sizeof...(STAGES_T)};
+    QUEUE_T _queues;
+    PROC_T _funcs;
+};
 
 /**
  * [语法糖]重载管道运算符
@@ -76,13 +129,13 @@ class Pipeline{
  * @return 处理结果
  */
 template<typename T, typename F>
-auto operator|(T&& data, F&& f){
+auto operator|(T &&data, F &&f) {
     return std::forward<F>(f)(std::forward<T>(data));
 }
 
 
 template<typename OUT_T, typename IN_T>
-auto make_pipe(std::function<OUT_T(IN_T)>&& f){
+auto make_pipe(std::function<OUT_T(IN_T)> &&f) {
     return Pipe<OUT_T, IN_T>(f);
 }
 

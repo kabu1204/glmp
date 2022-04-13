@@ -12,22 +12,12 @@
 #include "vector"
 #include "atomic"
 
-lfringqueue<std::function<void()>,1000> qf;
-void genfun(){
-//    auto* wrapped = new std::function<void()>([](){printf("wrapped function\n");});
-int a;
-    static std::function<void()>* wrapped = &([a](){printf("wrapped function\n");});
-    qf.enqueue(wrapped);
-}
-
 int main(){
     auto add1 = [](int x){return x+1;};
     auto mul2 = [](int x)->int{return (x<<1);};
     Pipe<int, int> p([](int x){return x*4;});
-    printf("%d\n", 2|p|add1|mul2);
-    genfun();
-    std::function<void()> *fp;
-    qf.dequeue(&fp);
-    (*fp)();
+    printf("%d\n", 2 | p | add1 | mul2);
 
+    QueuePipeline<bool, short, int, double> q;
+    q.DebugInfo();
 }
