@@ -57,7 +57,7 @@ public:
      * @return 所提交任务的future对象，可以获取任务返回值
      */
     template<typename F, typename... Args>
-    auto submit(F&& function, Args&&...args){
+    auto Submit(F&& function, Args&&...args){
         if(status<0) throw std::runtime_error("threadpool stopped");
         using return_type = typename std::result_of<F(Args...)>::type;
         auto task = std::make_shared<std::packaged_task<return_type()>>(std::bind(std::forward<F>(function), std::forward<Args>(args)...));
@@ -69,7 +69,7 @@ public:
     /**
      * @brief 停止线程池，禁止提交任务并且回收线程
      */
-    void stop(){
+    void Stop(){
         status=-1;
         for(std::thread& th:workers) th.join();
     }
