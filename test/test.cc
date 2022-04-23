@@ -2,7 +2,8 @@
 // Created by 于承业 on 2022/4/4.
 //
 
-#include "glfw3.h"
+#include <utility>
+
 #include "include/library.h"
 #include "include/pipeline.h"
 #include "include/concurrentqueue.hpp"
@@ -13,27 +14,33 @@
 #include "atomic"
 #include "sys/ucontext.h"
 #include "include/mpmc_pipeline.h"
-//#include "include/dynamic_pipeline.h"
+#include "co/co.h"
+#include "co/flag.h"
 
 void example_ringqueue(){
-    lfringqueue<int, 1000> rq;
-    for(int i=0;i<100;++i){
-        rq.enqueue(new int(i));
-    }
-    for(int i=0;i<100;++i){
-        int *p;
-        rq.dequeue(&p);
-        printf("%d\n",*p);
-    }
+    lfringqueue<int, 8000> rq;
+    co::WaitGroup wg;
+    auto f = [&rq, &wg](){
+        for (int i = 0; i < 1000; ++i) {
+            rq.enqueue(new int(i));
+        }
+        wg.done();
+    };
+    wg.add(8);
+    for(int i=0;i<8;++i) go(f);
+    wg.wait();
+    printf("Size of rq: %ld\n", rq.countguess());
 }
 
-struct test_s {
-    int a;
-    std::string s;
-    test_s():a(999), s("hello"){}
+struct Example {
+    int num;
+    std::string str;
+    Example():num(999), str("hello"){}
+    Example(int n, std::string s):num(n), str(std::move(s)){}
 };
 
-int main(){
+int main(int argc, char** argv) {
+    flag::init(argc, argv);
 
 //    auto add1 = [](int x){return x+1;};
 //    auto mul2 = [](int x)->int{return (x<<1);};
@@ -46,30 +53,65 @@ int main(){
 //    Video --> AVPackage --> PVideo:(from(AVPkgs) --> transform_to_avframe)              --> merge --> RenderV:()
 //                        --> PAudio:(from(AVPkgs) --> transform_to_avframe --> resample) -->       --> RenderA:()
 
-    pipeline::_pipe_base pt1;
-    pipeline::_pipe_base pt2;
-    pt1.SetNext(&pt2);
-    auto proc = [](test_s* in)->int*{
-        int* out = new int(in->a+1);
+    example_ringqueue();
+
+
+    auto str_to_upper = [](Example* in)->Example*{
+        std::transform(in->str.begin(), in->str.end(), in->str.begin(), ::toupper);
+        return in;
+    };
+    auto concat = [](Example* in)->std::string*{
+        auto* out = new std::string(in->str + "_" + std::to_string(in->num));
+        delete in;
         return out;
     };
-    test_s a;
-    a.s = "world";
-    pt1.Submit(new test_s());
-    pt1.Submit(&a);
-    pt1.SetFunc<test_s, int>(proc);
-    pt1.RunOnce();
-    for(int i=0;i<2;++i) {
-        test_s *pdata = nullptr;
-        pt1.Get(pdata);
-        if(pdata) std::cout<<pdata->s<<" ";
-    }
 
-    int* intp = nullptr;
-    pt2.Get(intp);
-    if(intp) std::cout<<*intp<<std::endl;
+    // 1. 定义
+    pipeline::_pipe_base pp1, pp2;
+    pipeline::Output o;
+
+    // 2. 组合
+    pp1.SetNext(&pp2);
+    pp2.SetNext(&o);
+
+    // 3. 处理函数
+    pp1.SetFunc<Example, Example>(str_to_upper);
+    pp2.SetFunc<Example, std::string>(concat);
+
+    pipeline::Segment ppl(&pp1);
+
+    auto *sched = co::next_scheduler();
+    co::WaitGroup wg;
+    co::Event ev;
+    wg.add(2);
+    auto push_data = [&ev, &wg, &ppl](){
+        for(int i=0;i<1000;++i){
+            ppl.Submit(new Example(i, std::string(1, char(i%26+'a'))));
+//            ppl.RunOnce();
+            ev.signal();
+        }
+        wg.done();
+    };
+    auto pop_data = [&wg, &ppl](){
+        int cnt = 0;
+        std::string *pdata{nullptr};
+        while(true){
+            ppl.Get(pdata);
+            if(pdata != nullptr){
+                ++cnt;
+                std::cout<<(*pdata)<<std::endl;
+            }
+            if(cnt==1000) break;
+        }
+        wg.done();
+    };
+
+    ppl.Run(ev);
+    go(push_data);
+    go(pop_data);
 
 
+    wg.wait();
 //    QueuePipeline<bool, short, int, double> q;
 //    q.DebugInfo();
 //

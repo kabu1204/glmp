@@ -69,10 +69,10 @@ private:
  * @param f 普通函数、lambda函数、std::function等
  * @return 处理结果
  */
-template<typename T, typename F>
-auto operator|(T &&data, F &&f) {
-    return std::forward<F>(f)(std::forward<T>(data));
-}
+//template<typename T, typename F>
+//auto operator|(T &&data, F &&f) {
+//    return std::forward<F>(f)(std::forward<T>(data));
+//}
 
 template<typename OUT_T, typename IN_T>
 auto make_pipe(std::function<OUT_T(IN_T)> &&f) {
