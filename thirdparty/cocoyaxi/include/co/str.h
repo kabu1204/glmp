@@ -2,7 +2,6 @@
 
 #include "err.h"
 #include "fastring.h"
-#include "stl/vector.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -23,11 +22,11 @@ namespace str {
  * @param c  the delimiter, either a single character or a null-terminated string.
  * @param n  max split times, 0 or -1 for unlimited.
  */
-__coapi co::vector<fastring> split(const char* s, char c, uint32 n=0);
-__coapi co::vector<fastring> split(const fastring& s, char c, uint32 n=0);
-__coapi co::vector<fastring> split(const char* s, const char* c, uint32 n=0);
+__codec std::vector<fastring> split(const char* s, char c, uint32 n=0);
+__codec std::vector<fastring> split(const fastring& s, char c, uint32 n=0);
+__codec std::vector<fastring> split(const char* s, const char* c, uint32 n=0);
 
-inline co::vector<fastring> split(const fastring& s, const char* c, uint32 n=0) {
+inline std::vector<fastring> split(const fastring& s, const char* c, uint32 n=0) {
     return split(s.c_str(), c, n);
 }
 
@@ -41,8 +40,8 @@ inline co::vector<fastring> split(const fastring& s, const char* c, uint32 n=0) 
  * @param to   string replaced to.
  * @param n    max replace times.
  */
-__coapi fastring replace(const char* s, const char* sub, const char* to, uint32 n=0);
-__coapi fastring replace(const fastring& s, const char* sub, const char* to, uint32 n=0);
+__codec fastring replace(const char* s, const char* sub, const char* to, uint32 n=0);
+__codec fastring replace(const fastring& s, const char* sub, const char* to, uint32 n=0);
 
 /**
  * strip a string 
@@ -55,11 +54,11 @@ __coapi fastring replace(const fastring& s, const char* sub, const char* to, uin
  * @param c  characters to be stripped, either a single character or a null-terminated string.
  * @param d  direction, 'l' for left, 'r' for right, 'b' for both sides.
  */
-__coapi fastring strip(const char* s, const char* c=" \t\r\n", char d='b');
-__coapi fastring strip(const char* s, char c, char d = 'b');
-__coapi fastring strip(const fastring& s, const char* c=" \t\r\n", char d='b');
-__coapi fastring strip(const fastring& s, char c, char d='b');
-__coapi fastring strip(const fastring& s, const fastring& c, char d='b');
+__codec fastring strip(const char* s, const char* c=" \t\r\n", char d='b');
+__codec fastring strip(const char* s, char c, char d = 'b');
+__codec fastring strip(const fastring& s, const char* c=" \t\r\n", char d='b');
+__codec fastring strip(const fastring& s, char c, char d='b');
+__codec fastring strip(const fastring& s, const fastring& c, char d='b');
 
 /**
  * convert string to built-in types 
@@ -68,12 +67,12 @@ __coapi fastring strip(const fastring& s, const fastring& c, char d='b');
  *   - Call err::get() to get the error number. Don't use `errno` directly as we 
  *     use GetLastError and SetLastError on windows.
  */
-__coapi bool to_bool(const char* s);
-__coapi int32 to_int32(const char* s);
-__coapi int64 to_int64(const char* s);
-__coapi uint32 to_uint32(const char* s);
-__coapi uint64 to_uint64(const char* s);
-__coapi double to_double(const char* s);
+__codec bool to_bool(const char* s);
+__codec int32 to_int32(const char* s);
+__codec int64 to_int64(const char* s);
+__codec uint32 to_uint32(const char* s);
+__codec uint64 to_uint64(const char* s);
+__codec double to_double(const char* s);
 
 inline bool to_bool(const fastring& s)        { return to_bool(s.c_str()); }
 inline bool to_bool(const std::string& s)     { return to_bool(s.c_str()); }
@@ -166,12 +165,6 @@ inline fastring dbg(const std::pair<K, V>& x) {
 // convert std::vector to a debug string
 template<typename T>
 inline fastring dbg(const std::vector<T>& v) {
-    return xx::dbg(v.begin(), v.end(), '[', ']');
-}
-
-// convert co::vector to a debug string
-template<typename T>
-inline fastring dbg(const co::vector<T>& v) {
     return xx::dbg(v.begin(), v.end(), '[', ']');
 }
 

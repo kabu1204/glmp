@@ -5,35 +5,44 @@
 #include "atomic.h"
 #include <functional>
 
-__coapi DEC_bool(cout);
-__coapi DEC_int32(min_log_level);
+__codec DEC_bool(cout);
+__codec DEC_int32(min_log_level);
 
 namespace ___ {
 namespace log {
 
 /**
- * stop the logging thread and write all buffered logs to destination.
- *   - This function will be automatically called at exit.
+ * initialize the log library and start the logging thread 
+ *   - log::init() should be called once at the beginning of main(). 
+ *   - It is safe to call log::init() for multiple times. 
  */
-__coapi void exit();
+__codec void init();
 
-enum {
-    splitlogs = 1,
-    log2local = 2,
-};
+/**
+ * close the log library 
+ *   - write all buffered logs to destination.
+ *   - stop the logging thread.
+ */
+__codec void exit();
+
+// deprecated since v2.0.2, use log::exit() instead.
+__codec void close();
 
 /**
  * set a callback for writing logs
- *   - By default, logs will be written into a local file. Users can set a callback to 
+ *   - By default, logs will be written into a file. Users can set a callback to 
  *     write logs to different destinations.
- * 
- * @param cb     The callback, takes 2 params, a pointer to the log buffer, and its length.
- * @param flags  Formed by ORing any of the following values:
- *               - log::splitlogs: split logs in the log buffer, and write one by one, 
- *                 which is useful when users want to send logs by UDP.
- *               - log::log2local: also log to local file
+ *   - The callback has 2 parameters, a pointer to the log buffer and its length. 
+ *     The buffer may contain more than one logs.
  */
-__coapi void set_write_cb(const std::function<void(const void*, size_t)>& cb, int flags=0);
+__codec void set_write_cb(const std::function<void(const void*, size_t)>& cb);
+
+/**
+ * set a callback for writing a single log
+ *   - Similar to set_write_cb, but the callback writes a single log each time. 
+ *     It may be useful when users want to send logs by UDP.
+ */
+__codec void set_single_write_cb(const std::function<void(const void*, size_t)>& cb);
 
 namespace xx {
 
@@ -45,7 +54,7 @@ enum LogLevel {
     fatal = 4
 };
 
-class __coapi LevelLogSaver {
+class __codec LevelLogSaver {
   public:
     LevelLogSaver(const char* file, int len, unsigned int line, int level);
     ~LevelLogSaver();
@@ -57,7 +66,7 @@ class __coapi LevelLogSaver {
     size_t _n;
 };
 
-class __coapi FatalLogSaver {
+class __codec FatalLogSaver {
   public:
     FatalLogSaver(const char* file, int len, unsigned int line);
     ~FatalLogSaver();

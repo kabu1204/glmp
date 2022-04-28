@@ -17,6 +17,8 @@
 #include "co/co.h"
 #include "co/flag.h"
 
+
+
 void example_ringqueue(){
     lfringqueue<int, 8000> rq;
     co::WaitGroup wg;
@@ -39,8 +41,10 @@ struct Example {
     Example(int n, std::string s):num(n), str(std::move(s)){}
 };
 
+//DEF_main(argc, argv){
 int main(int argc, char** argv) {
     flag::init(argc, argv);
+    co::init();
 
 //    auto add1 = [](int x){return x+1;};
 //    auto mul2 = [](int x)->int{return (x<<1);};
@@ -80,15 +84,17 @@ int main(int argc, char** argv) {
 
     pipeline::Segment ppl(&pp1);
 
-    auto *sched = co::next_scheduler();
+
+    auto sched_v = co::all_schedulers();
+
+#define PUSH_ROUTINE 0
+#define POP_ROUTINE 1
+
     co::WaitGroup wg;
-    co::Event ev;
     wg.add(2);
-    auto push_data = [&ev, &wg, &ppl](){
+    auto push_data = [&wg, &ppl, &sched_v](){
         for(int i=0;i<1000;++i){
             ppl.Submit(new Example(i, std::string(1, char(i%26+'a'))));
-//            ppl.RunOnce();
-            ev.signal();
         }
         wg.done();
     };
@@ -106,12 +112,16 @@ int main(int argc, char** argv) {
         wg.done();
     };
 
-    ppl.Run(ev);
-    go(push_data);
-    go(pop_data);
+    std::cout<<"PID:"<<getpid()<<std::endl;
+//    ppl.Run();
+    sched_v[PUSH_ROUTINE]->go(push_data);
+    sched_v[POP_ROUTINE]->go(pop_data);
 
 
+    ppl.Run(false);
     wg.wait();
+    ppl.Stop();
+    printf("ok\n");
 //    QueuePipeline<bool, short, int, double> q;
 //    q.DebugInfo();
 //

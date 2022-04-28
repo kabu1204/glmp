@@ -1,13 +1,6 @@
 #pragma once
 
 #include <stdint.h>
-#include <stddef.h>
-
-#if SIZE_MAX == UINT64_MAX
-#define __arch64 1
-#else
-#define __arch32 1
-#endif
 
 typedef int8_t  int8;
 typedef int16_t int16;
@@ -54,21 +47,21 @@ typedef uint64_t uint64;
 #define  unlikely(x)  (x)
 #endif
 
-// generated from config.h.in
+#ifdef _MSC_VER
 #include "config.h"
+#endif
 
-// __coapi: used to export symbols in shared co
-// Do not use (or reuse outside of cocoyaxi) this definiton  yourself
-#if COCOYAXI_SHARED > 0
-  #ifdef _WIN32
-    #ifdef BUILDING_CO_SHARED
-      #define __coapi __declspec(dllexport)
-    #else
-      #define __coapi __declspec(dllimport)
-    #endif
+// __codef: define global variables
+// __codec: declare classes, functions, global variables
+#if defined(_MSC_VER) && USING_CO_DLL > 0
+  #ifdef BUILDING_CO_DLL
+    #define __codef __declspec(dllexport)
+    #define __codec __declspec(dllexport)
   #else
-    #define __coapi __attribute__((visibility("default")))
+    #define __codef
+    #define __codec __declspec(dllimport)
   #endif
 #else
-  #define __coapi
+  #define __codef
+  #define __codec
 #endif

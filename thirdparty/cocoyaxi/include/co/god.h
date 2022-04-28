@@ -1,9 +1,12 @@
 #pragma once
 
-#include "def.h"
 #include <type_traits>
 
 namespace god {
+
+inline void om_mani_padme_hum() {}
+
+inline void fast_fast_biu_biu() {}
 
 inline void bless_no_bugs() {}
 
@@ -15,39 +18,8 @@ inline void give_me_a_raise() {}
 template <typename T, typename V>
 inline T swap(T* p, V v) {
     T x = *p;
-    *p = (T)v;
+    if (x != (T)v) *p = (T)v;
     return x;
-}
-
-template <typename T, typename V>
-inline T fetch_add(T* p, V v) {
-    T x = *p;
-    *p += v;
-    return x;
-}
-
-// @align must be power of 2
-template <typename X, typename A>
-inline X align_up(X x, A align) {
-    const X o = static_cast<X>(align) - 1;
-    return (x + o) & ~o;
-}
-
-template <typename X, typename A>
-inline X* align_up(X* x, A align) {
-    return (X*) align_up((size_t)x, align);
-}
-
-// @align must be power of 2
-template <typename X, typename A>
-inline X align_down(X x, A align) {
-    const X o = static_cast<X>(align) - 1;
-    return x & ~o;
-}
-
-template <typename X, typename A>
-inline X* align_down(X* x, A align) {
-    return (X*) align_down((size_t)x, align);
 }
 
 /**
@@ -72,18 +44,9 @@ inline T b8(T n) {
  * whether the first sizeof(T) bytes are equal
  */
 template <typename T>
-inline bool byte_eq(const void* p, const void* q) {
+inline bool bytes_eq(const void* p, const void* q) {
     return *(const T*)p == *(const T*)q;
 }
-
-template <int N>
-inline void byte_cp(void* dst, const void* src) {
-    byte_cp<N - 1>(dst, src);
-    *((char*)dst + N - 1) = *((const char*)src + N - 1);
-}
-
-template <>
-inline void byte_cp<0>(void* dst, const void* src) {}
 
 // remove lvalue or rvalue reference
 template <typename T>
@@ -154,23 +117,6 @@ inline constexpr bool is_class() {
 template <typename T>
 inline constexpr bool is_scalar() {
     return std::is_scalar<T>::value;
-}
-
-#if defined(__GNUC__) && __GNUC__ < 5
-template <typename T>
-inline constexpr bool is_trivially_copyable() {
-    return __has_trivial_copy(T);
-}
-#else
-template <typename T>
-inline constexpr bool is_trivially_copyable() {
-    return std::is_trivially_copyable<T>::value;
-}
-#endif
-
-template <typename T>
-inline constexpr bool is_trivially_destructible() {
-    return std::is_trivially_destructible<T>::value;
 }
 
 template <bool C, typename T=void>

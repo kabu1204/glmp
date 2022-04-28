@@ -10,7 +10,7 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <windows.h>
+#include <Windows.h>
 
 namespace co {
 namespace xx {
@@ -61,8 +61,8 @@ inline void mutex_unlock(mutex_t* m)   { int r = pthread_mutex_unlock(m); assert
 inline bool mutex_try_lock(mutex_t* m) { return pthread_mutex_trylock(m) == 0; }
 
 typedef pthread_cond_t cond_t;
-__coapi void cond_init(cond_t* c);
-__coapi bool cond_wait(cond_t* c, mutex_t* m, uint32 ms);
+void cond_init(cond_t* c);
+bool cond_wait(cond_t* c, mutex_t* m, uint32 ms);
 inline void cond_destroy(cond_t* c)          { pthread_cond_destroy(c); }
 inline void cond_wait(cond_t* c, mutex_t* m) { pthread_cond_wait(c, m); }
 inline void cond_notify(cond_t* c)           { pthread_cond_broadcast(c); }
@@ -70,7 +70,7 @@ inline void cond_notify(cond_t* c)           { pthread_cond_broadcast(c); }
 typedef pthread_t thread_t;
 typedef void* (*thread_fun_t)(void*);
 #define _CO_DEF_THREAD_FUN(f, p) static void* f(void* p)
-__coapi uint32 thread_id();
+uint32 thread_id();
 inline void thread_start(thread_t* t, thread_fun_t f, void* p) { int r = pthread_create(t, 0, f, p); assert(r == 0); }
 inline void thread_join(thread_t t)                            { pthread_join(t, 0); }
 inline void thread_detach(thread_t t)                          { pthread_detach(t); }
@@ -86,7 +86,7 @@ inline void tls_set(tls_t k, void* v) { int r = pthread_setspecific(k, v); asser
 
 #endif
 
-class __coapi Mutex {
+class __codec Mutex {
   public:
     Mutex() {
         co::xx::mutex_init(&_mutex);
@@ -117,7 +117,7 @@ class __coapi Mutex {
     DISALLOW_COPY_AND_ASSIGN(Mutex);
 };
 
-class __coapi MutexGuard {
+class __codec MutexGuard {
   public:
     explicit MutexGuard(Mutex& lock) : _lock(lock) {
         _lock.lock();
@@ -136,7 +136,7 @@ class __coapi MutexGuard {
     DISALLOW_COPY_AND_ASSIGN(MutexGuard);
 };
 
-class __coapi SyncEvent {
+class __codec SyncEvent {
   public:
     explicit SyncEvent(bool manual_reset = false, bool signaled = false)
         : _counter(0), _manual_reset(manual_reset), _signaled(signaled) {
@@ -204,7 +204,7 @@ class __coapi SyncEvent {
 //
 // run independently from thread object:
 //   Thread(f).detach();                 // void f();
-class __coapi Thread {
+class __codec Thread {
   public:
     // @cb is not saved in this thread object, but passed directly to the
     // thread function, so it can run independently from the thread object.

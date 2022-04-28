@@ -108,11 +108,14 @@ namespace pipeline {
 
     class Segment{
         friend class Segment;
+        friend class Pipeline;
     public:
         Segment() = default;
-        explicit Segment(_pipe_base* head):_head(head){
+        explicit Segment(_pipe_base* head, int n_parallel=1):_head(head){
                 while(head->_next) head = head->_next;
                 _tail = head;
+                n_concurrent = 1000;
+                this->n_parallel = n_parallel;
         }
         template<typename T>
         void Submit(T* pdata){
@@ -130,30 +133,70 @@ namespace pipeline {
                 p = p->_next;
             }
         }
-        void Run(co::Event& ev){
-            go([&ev, this](){
-                while(true){
+        void Run(bool blocking=true){
+            _running = true;
+            auto loop = [this](){
+                auto sched_v = co::all_schedulers();
+                int n_scheds = co::scheduler_num();
+                int sid = n_scheds-1;
+                int min_sid = n_scheds-n_parallel;
+                co::WaitGroup wg;
+                auto f = [this, wg](){
                     RunOnce();
+                    wg.done();
+                };
+                while(_running){
+                    wg.add(n_concurrent);
+                    for(int i=0;i<n_concurrent && _running;++i){
+                        sched_v[sid--]->go(f);
+                        if(sid<min_sid) sid = n_scheds-1;
+                    }
+                    if(_running) wg.wait();
                 }
-            });
+            };
+            if(blocking) loop();
+            else std::thread(loop).detach();
         }
-        void Stop(){}
+        void Stop(){ _running = false; }
 
     private:
         _pipe_base* _head{nullptr};
         _pipe_base* _tail{nullptr};
         Segment* _next{nullptr};
+        std::atomic<bool> _running{false};
+        std::atomic<int> n_concurrent;
+        std::atomic<int> n_parallel;
     };
 
     class Pipeline{
         friend class Pipeline;
     public:
         Pipeline() = default;
+        Pipeline(Segment* head):_head(head){}
+        void Run(bool blocking=true){
+            Segment* pSegment = _head;
+            while(pSegment){
+                //TODO: 启动策略
+                pSegment->Run(blocking);
+                pSegment = pSegment->_next;
+            }
+        }
+        void Stop(){
+            Segment* pSegment = _head;
+            while(pSegment){
+                pSegment->Stop();
+                pSegment = pSegment->_next;
+            }
+        }
 
     private:
         Segment* _head{nullptr};
     };
 
+    Segment* parallel(_pipe_base* head, int n_parallel=2){
+        auto* seg = new Segment(head, n_parallel);
+        return seg;
+    }
 };
 
 #endif //GLMP_MPMC_PIPELINE_H
