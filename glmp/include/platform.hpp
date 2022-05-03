@@ -34,7 +34,6 @@ template<typename... Ts> struct select_last {
     template<typename T> struct tag{
         using type = T;
     };
-    // Use a fold-expression to fold the comma operator over the parameter pack.
     using type = typename decltype((tag<Ts>{}, ...))::type;
 };
 #else
@@ -94,6 +93,28 @@ constexpr auto type_name() {
     name.remove_suffix(suffix.size());
     return name;
 }
+
+
+// helpers used to get return type or type of first argument
+
+template<typename F, typename Ret, typename A, typename... Rest>
+Ret helper_lambda_ret(Ret (F::*)(A, Rest...));
+
+template<typename F, typename Ret, typename A, typename... Rest>
+Ret helper_lambda_ret(Ret (F::*)(A, Rest...) const);
+
+template<typename F, typename Ret, typename A, typename... Rest>
+A helper_lambda_arg0(Ret (F::*)(A, Rest...));
+
+template<typename F, typename Ret, typename A, typename... Rest>
+A helper_lambda_arg0(Ret (F::*)(A, Rest...) const);
+
+
+template<typename F>
+struct lambda_traits {
+    using arg0 = decltype( helper_lambda_arg0(&F::operator()) );
+    using ret = decltype( helper_lambda_ret(&F::operator()) );
+};
 
 #define PRINT_TYPE_OF_VAR(X) std::cout<<type_name<decltype(X)>()<<std::endl
 #define PRINT_TYPE(X) std::cout<<type_name<X>()<<std::endl
