@@ -1,2 +1,2 @@
 # GLMP
-A openGL-based Multimedia video Player
+A pipeline library supporting parallel submission

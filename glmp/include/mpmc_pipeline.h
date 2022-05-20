@@ -17,6 +17,10 @@ namespace pipeline {
 
     class Pipeline;
     class Segment;
+    class Output;
+    class From;
+    class Sole;
+    class Fork;
 
     class _instance {
         _instance() = default;
@@ -39,6 +43,10 @@ namespace pipeline {
     class _pipe_base {
         friend class Pipeline;
         friend class Segment;
+        friend class Sole;
+        friend class From;
+        friend class Output;
+        friend class Fork;
     public:
         _pipe_base() = default;
         explicit _pipe_base(std::size_t bufSize): _queue(bufSize) {}
@@ -179,12 +187,110 @@ namespace pipeline {
     class Output: public _pipe_base{
         friend class Pipeline;
         friend class _pipe_base;
+        friend class Segment;
     public:
         void SetNext(_pipe_base* next) = delete;
         template<class T> void Get(T*& pdata) = delete;
     public:
         Output() = default;
+//        Output(std::size_t bufSize = DEFAULT_RING_BUFFER_SIZE): _pipe_base(bufSize) {}
     };
+
+    class From: public _pipe_base{
+        friend class Pipeline;
+        friend class _pipe_base;
+        friend class Segment;
+    public:
+        void SetNext(_pipe_base* next) = delete;
+        template<class T> void Get(T*& pdata) = delete;
+    public:
+        From() = default;
+        template<typename F>
+        From(F f, std::size_t bufSize = DEFAULT_RING_BUFFER_SIZE): _pipe_base(bufSize){
+            SetFunc<F>(f);
+        }
+
+        template<typename F>
+        void SetFunc(F f){
+            using OUT = decltype(f());
+            auto fp = std::make_shared<F>(f);
+            auto wrapped_func = [this, fp](){
+                OUT _pdata = (*fp)();
+                _next->Submit<std::remove_pointer_t<OUT>>(_pdata);
+            };
+            _proc = wrapped_func;
+        }
+    };
+
+    class Sole: public _pipe_base{
+        friend class Pipeline;
+        friend class _pipe_base;
+        friend class Segment;
+    public:
+        void SetNext(_pipe_base* next) = delete;
+        template<class T> void Get(T*& pdata) = delete;
+    public:
+        Sole() = default;
+        template<typename F>
+        Sole(F f, std::size_t bufSize = DEFAULT_RING_BUFFER_SIZE): _pipe_base(bufSize){
+            SetFunc<F>(f);
+        }
+
+        template<typename F>
+        void SetFunc(F f){
+            auto fp = std::make_shared<F>(f);
+            auto wrapped_func = [this, fp](){
+                (*fp)();
+            };
+            _proc = wrapped_func;
+        }
+    };
+
+    class Fork: public _pipe_base{
+        friend class Pipeline;
+        friend class _pipe_base;
+        friend class Segment;
+    public:
+        void SetNext(_pipe_base* next) = delete;
+        template<class T> void Get(T*& pdata) = delete;
+    public:
+        Fork() = default;
+        template<typename F>
+        Fork(F f, std::size_t bufSize = DEFAULT_RING_BUFFER_SIZE): _pipe_base(bufSize){
+            SetFunc<F>(f);
+        }
+
+        template<typename F>
+        void SetFunc(F filter){
+            using IN = typename lambda_traits<F>::arg0;
+            using OUT = typename lambda_traits<F>::ret;
+            static_assert(std::is_same<OUT, int>::value);
+            auto fp = std::make_shared<F>(filter);
+            auto wrapped_func = [this, fp](){
+                IN pdata{nullptr};
+                Get(pdata);
+                if(pdata != nullptr) {
+                    int i = (*fp)(pdata);
+                    if(i>=0 && i<forks.size()){
+                        forks[i]->Submit<std::remove_pointer_t<IN>>(pdata);
+                    }   // 否则会被丢弃
+                }
+            };
+            _proc = wrapped_func;
+        }
+
+        void SetNext(_pipe_base* next, int i){
+            if(i<forks.size()) forks[i] = next;
+            else if (i==forks.size()) forks.push_back(next);
+            else return;
+            next->_prev = this;
+            _end_proc = false;
+        }
+    protected:
+        std::vector<_pipe_base*> forks;
+    };
+
+
 
     /**
      * 若干_pipe_base串成一个Segment

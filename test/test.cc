@@ -4,7 +4,6 @@
 
 #include <utility>
 
-#include "include/library.h"
 #include "include/pipeline.h"
 #include "include/concurrentqueue.hpp"
 #include "include/ringqueue.hpp"
@@ -53,11 +52,15 @@ int main(int argc, char** argv) {
         std::transform(in->str.begin(), in->str.end(), in->str.begin(), ::toupper);
         return in;
     };
-    auto concat = [](Example* in)->std::string*{
-        auto* out = new std::string(in->str + "_" + std::to_string(in->num));
+    std::string delim = "?";
+    auto concat = [delim](Example* in)->std::string*{
+        auto* out = new std::string(in->str + delim + std::to_string(in->num));
         delete in;
         return out;
     };
+
+    auto nf = [](){int* a = new int(0); return a;};
+    pipeline::From ppf(nf, 1);
 
     // 1. 定义
     pipeline::_pipe_base pp1, pp2;
