@@ -3,14 +3,11 @@ project(glmp)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(/usr/local/include thirdparty/cocoyaxi/include glmp)
+if(APPLE)
+    add_compile_options(-fno-pie)
+endif()
 
-link_directories(thirdparty/cocoyaxi/lib)
+add_subdirectory(glmp)
+add_subdirectory(test)
 
-add_library(glmp glmp/src/library.cc glmp/include/threadpool.hpp glmp/src/pipeline.cc glmp/include/pipeline.h glmp/include/concurrentqueue.hpp glmp/include/ringqueue.hpp)
-
-add_executable(test test/test.cc)
-
-target_link_libraries(test co)
-
-add_compile_options(-stdlib=libc++)
+add_dependencies(test pipeline)
